@@ -1,114 +1,103 @@
 import { useState, useEffect } from "react";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import {
-    firstYearCourses,
-    secondYearCourses,
-    thirdYearCourses,
-    fourthYearCourses,
+  firstYearCourses,
+  secondYearCourses,
+  thirdYearCourses,
+  fourthYearCourses,
 } from "@/utils/coursesData";
 
-const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GOOGLE_AI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
-
-const generationConfig = {
-    temperature: 2,
-    topP: 0.95,
-    topK: 40,
-    maxOutputTokens: 8192,
-};
-
 export function useStudentAdvisor() {
-    const [step, setStep] = useState(1);
-    const [gpa, setGpa] = useState("");
-    const [advice, setAdvice] = useState("");
-    const [loading, setLoading] = useState(false);
-    const [selected, setSelected] = useState([]);
-    const [completed, setCompleted] = useState([]);
-    const [level, setLevel] = useState("");
-    const [department, setDepartment] = useState("");
-    const [term, setTerm] = useState("");
-    const [lang, setLang] = useState(false);
-    const [progress, setProgress] = useState(0);
-    const [totalCredits, setTotalCredits] = useState(0);
-    const [credits, setCredits] = useState(0);
+  const [step, setStep] = useState(1);
+  const [gpa, setGpa] = useState("");
+  const [advice, setAdvice] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [selected, setSelected] = useState([]);
+  const [completed, setCompleted] = useState([]);
+  const [level, setLevel] = useState("");
+  const [department, setDepartment] = useState("");
+  const [term, setTerm] = useState("");
+  const [lang, setLang] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [totalCredits, setTotalCredits] = useState(0);
+  const [credits, setCredits] = useState(0);
 
-    useEffect(() => {
-        setSelected([]);
-    }, [term]);
+  useEffect(() => {
+    setSelected([]);
+  }, [term]);
 
-    useEffect(() => {
-        setTotalCredits(
-            selected?.reduce((sum, item) => sum + (item.credits || 0), 0)
+  useEffect(() => {
+    setTotalCredits(
+      selected?.reduce((sum, item) => sum + (item.credits || 0), 0),
+    );
+  }, [selected]);
+
+  useEffect(() => {
+    setCredits(gpa < 2 ? 12 : 18);
+  }, [gpa]);
+
+  const courses = () => {
+    let items = [];
+    let year;
+
+    switch (level) {
+      case "first":
+        year = firstYearCourses;
+        break;
+      case "second":
+        year = secondYearCourses;
+        break;
+      case "third":
+        year = thirdYearCourses.filter(
+          (data) => data.department === department,
         );
-    }, [selected]);
+        break;
+      case "fourth":
+        year = fourthYearCourses.filter(
+          (data) => data.department === department,
+        );
+        break;
+      default:
+        year = [];
+        break;
+    }
 
-    useEffect(() => {
-        setCredits(gpa < 2 ? 12 : 18);
-    }, [gpa]);
+    if (term === "first") {
+      items = year.filter((data) => data.term === "term1");
+    } else if (term === "second") {
+      items = year.filter((data) => data.term === "term2");
+    }
 
-    const courses = () => {
-        let items = [];
-        let year;
+    return items;
+  };
 
-        switch (level) {
-            case "first":
-                year = firstYearCourses;
-                break;
-            case "second":
-                year = secondYearCourses;
-                break;
-            case "third":
-                year = thirdYearCourses.filter(
-                    (data) => data.department === department
-                );
-                break;
-            case "fourth":
-                year = fourthYearCourses.filter(
-                    (data) => data.department === department
-                );
-                break;
-            default:
-                year = [];
-                break;
-        }
+  const handleSubmit = async (e) => {
+    let prompt;
 
-        if (term === "first") {
-            items = year.filter((data) => data.term === "term1");
-        } else if (term === "second") {
-            items = year.filter((data) => data.term === "term2");
-        }
+    e.preventDefault();
+    setLoading(true);
 
-        return items;
-    };
+    const coursesDetails = courses().map((course) => {
+      const prerequisitesNames =
+        course.prerequisites.length > 0
+          ? course.prerequisites
+              .map(
+                (code) =>
+                  firstYearCourses.find((data) => data.courseCode === code)
+                    ?.nameAr ||
+                  secondYearCourses.find((data) => data.courseCode === code)
+                    ?.nameAr ||
+                  thirdYearCourses.find((data) => data.courseCode === code)
+                    ?.nameAr ||
+                  fourthYearCourses.find((data) => data.courseCode === code)
+                    ?.nameAr,
+              )
+              .join(", ")
+          : "لا يوجد";
 
-    const handleSubmit = async (e) => {
-        let prompt;
+      return `${course.nameAr} (${course.name}) - ساعات معتمدة: ${course.credits}, المتطلبات المسبقة: ${prerequisitesNames}`;
+    });
 
-        e.preventDefault();
-        setLoading(true);
-
-        const coursesDetails = courses().map((course) => {
-            const prerequisitesNames =
-                course.prerequisites.length > 0
-                    ? course.prerequisites
-                        .map(
-                            (code) =>
-                                firstYearCourses.find((data) => data.courseCode === code)
-                                    ?.nameAr ||
-                                secondYearCourses.find((data) => data.courseCode === code)
-                                    ?.nameAr ||
-                                thirdYearCourses.find((data) => data.courseCode === code)
-                                    ?.nameAr ||
-                                fourthYearCourses.find((data) => data.courseCode === code)
-                                    ?.nameAr
-                        )
-                        .join(", ")
-                    : "لا يوجد";
-
-            return `${course.nameAr} (${course.name}) - ساعات معتمدة: ${course.credits}, المتطلبات المسبقة: ${prerequisitesNames}`;
-        });
-
-        prompt = `
+    prompt = `
         أنت مرشد أكاديمي لطلاب في الجامعة. طالب حاصل على GPA بقيمة ${gpa} يرغب في التسجيل في المواد التالية:
 
         ${selected.map((data) => data.name)}
@@ -132,43 +121,57 @@ export function useStudentAdvisor() {
         يرجى تقديم الإجابة باللغة العربية وبشكل واضح ومختصر
         `;
 
-        try {
-            const result = await model.generateContent(prompt, generationConfig);
-            setAdvice(result.response.text());
-        } catch (error) {
-            console.error("Error generating advice:", error);
-            setAdvice("حدث خطأ أثناء الحصول على النصيحة. يرجى المحاولة مرة أخرى.");
-        }
+    try {
+      const res = await fetch(
+        "https://api.groq.com/openai/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${process.env.NEXT_PUBLIC_GROQ_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: "groq/compound",
+            messages: [{ role: "user", content: prompt }],
+          }),
+        },
+      );
+      const data = await res.json();
+      setAdvice(data.choices[0].message.content);
+    } catch (error) {
+      console.error("Error generating advice:", error);
+      setAdvice("حدث خطأ أثناء الحصول على النصيحة. يرجى المحاولة مرة أخرى.");
+    }
 
-        setLoading(false);
-        setStep(5);
-        setProgress((prev) => prev + 0.4);
-    };
+    setLoading(false);
+    setStep(5);
+    setProgress((prev) => prev + 0.4);
+  };
 
-    return {
-        step,
-        setStep,
-        gpa,
-        setGpa,
-        advice,
-        loading,
-        selected,
-        setSelected,
-        completed,
-        setCompleted,
-        level,
-        setLevel,
-        department,
-        setDepartment,
-        term,
-        setTerm,
-        lang,
-        setLang,
-        progress,
-        setProgress,
-        totalCredits,
-        credits,
-        courses,
-        handleSubmit,
-    };
-} 
+  return {
+    step,
+    setStep,
+    gpa,
+    setGpa,
+    advice,
+    loading,
+    selected,
+    setSelected,
+    completed,
+    setCompleted,
+    level,
+    setLevel,
+    department,
+    setDepartment,
+    term,
+    setTerm,
+    lang,
+    setLang,
+    progress,
+    setProgress,
+    totalCredits,
+    credits,
+    courses,
+    handleSubmit,
+  };
+}
