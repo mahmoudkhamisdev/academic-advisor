@@ -5,6 +5,14 @@ import {
   thirdYearCourses,
   fourthYearCourses,
 } from "@/utils/coursesData";
+import OpenAI from "openai";
+
+const openai = new OpenAI({
+  baseURL: "https://openrouter.ai/api/v1",
+  apiKey:
+    "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",
+  dangerouslyAllowBrowser: true,
+});
 
 export function useStudentAdvisor() {
   const [step, setStep] = useState(1);
@@ -122,22 +130,16 @@ export function useStudentAdvisor() {
         `;
 
     try {
-      const res = await fetch(
-        "https://api.groq.com/openai/v1/chat/completions",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${process.env.NEXT_PUBLIC_AI_API_KEY}`,
+      const completion = await openai.chat.completions.create({
+        model: "liquid/lfm-2.5-1.2b-instruct:free",
+        messages: [
+          {
+            role: "user",
+            content: prompt,
           },
-          body: JSON.stringify({
-            model: "groq/compound",
-            messages: [{ role: "user", content: prompt }],
-          }),
-        },
-      );
-      const data = await res.json();
-      setAdvice(data.choices[0].message.content);
+        ],
+      });
+      setAdvice(completion.choices[0].message?.content);
     } catch (error) {
       console.error("Error generating advice:", error);
       setAdvice("حدث خطأ أثناء الحصول على النصيحة. يرجى المحاولة مرة أخرى.");
